@@ -253,6 +253,12 @@
                 <div class="window-title">🛒 نقطة البيع</div>
                 <div style="width: 60px;"></div>
             </div>
+            <div><label>نوع التسعير</label>
+                <select id="pos-price-type" onchange="calcGlassPreview()">
+                <option value="retail">تجزئة (عادي)</option>
+                <option value="wholesale">جملة</option>
+             </select>
+            </div>
             <div class="window-body">
                 
                 <div class="inner-card" style="border: 2px solid #f59e0b; margin-bottom: 20px;">
@@ -1100,20 +1106,31 @@
         sel.innerHTML = '<option value="">-- زبون عابر --</option>' + db.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
     }
 
-    function renderGlassTypesSelect() {
+      function renderGlassTypesSelect() {
         const sel = document.getElementById('pos-glass-type');
         if(!sel) return;
-        sel.innerHTML = (db.settings.plans || []).map(p => `<option value="${p.name}|${p.price}">${p.name} - ${p.price} دج/م²</option>`).join('');
+        sel.innerHTML = (db.settings.plans || []).map(p => `
+            <option value="${p.name}|${p.price}|${p.wholesalePrice || p.price}">${p.name} - تجزئة: ${p.price} / جملة: ${p.wholesalePrice || p.price}</option>
+        `).join('');
     }
 
     function calcGlassPreview() {
         const w = parseFloat(document.getElementById('pos-width').value) / 100 || 0;
         const h = parseFloat(document.getElementById('pos-height').value) / 100 || 0;
         const qty = parseInt(document.getElementById('pos-qty').value) || 1;
-        const price = parseFloat(document.getElementById('pos-glass-type').value.split('|')[1]) || 0;
+        
+        const typeVal = document.getElementById('pos-glass-type').value;
+        const priceType = document.getElementById('pos-price-type') ? document.getElementById('pos-price-type').value : 'retail';
+        
+        let pricePerM = 0;
+        if (typeVal) {
+            const parts = typeVal.split('|');
+            pricePerM = priceType === 'wholesale' ? parseFloat(parts[2]) : parseFloat(parts[1]);
+        }
+        
         const cut = parseFloat(document.getElementById('pos-cut-cost').value) || 0;
         
-        let total = ((w * h) * qty * price) + (cut * qty);
+        let total = ((w * h) * qty * pricePerM) + (cut * qty);
         if (db.settings.tvaEnabled) total += total * (db.settings.tvaRate / 100);
 
         document.getElementById('glass-preview-price').innerText = total.toFixed(2);
@@ -1124,24 +1141,28 @@
         const h = parseFloat(document.getElementById('pos-height').value);
         const qty = parseInt(document.getElementById('pos-qty').value);
         const typeVal = document.getElementById('pos-glass-type').value;
+        const priceType = document.getElementById('pos-price-type') ? document.getElementById('pos-price-type').value : 'retail';
         const cut = parseFloat(document.getElementById('pos-cut-cost').value) || 0;
         
         if (!w || !h) { showToast('أدخل المقاسات', 'warning'); return; }
 
-        const areaPerPiece = (w/100) * (h/100); 
-        const pricePerMeter = parseFloat(typeVal.split('|')[1]);
+        const areaPerPiece = (w/100) * (h/100);
+        
+        // تحديد السعر بناءً على اختيار تجزئة أو جملة
+        const parts = typeVal.split('|');
+        const pricePerMeter = priceType === 'wholesale' ? parseFloat(parts[2]) : parseFloat(parts[1]);
         
         let pricePerPiece = (areaPerPiece * pricePerMeter) + cut;
         if (db.settings.tvaEnabled) pricePerPiece += pricePerPiece * (db.settings.tvaRate / 100);
 
-               cart.push({ 
+        cart.push({ 
             id: 'glass-'+Date.now(), 
-            name: typeVal.split('|')[0], 
+            name: parts[0] + (priceType === 'wholesale' ? ' (جملة)' : ''), 
             width: w, 
             height: h, 
             area: areaPerPiece, 
-            basePrice: pricePerPiece, // <--- سعر القطعة الثابت (لا يتغير)
-            price: pricePerPiece,     // السعر الإجمالي (سيتغير مع الكمية)
+            basePrice: pricePerPiece, 
+            price: pricePerPiece, 
             qty: qty,             
             type: 'glass' 
         });
@@ -1154,7 +1175,7 @@
         document.getElementById('pos-cut-cost').value = '0';
         document.getElementById('glass-preview-price').innerText = '0';
     }
-
+    
     function renderStoreProducts() {
         const container = document.getElementById('pos-products-grid');
         if (!container) return;
@@ -1589,31 +1610,73 @@
         if (!container) return;
         container.innerHTML = (db.settings.plans || []).map(p => `
             <div style="padding: 10px; background: rgba(139,92,246,0.05); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div><div style="font-weight: 700; font-size: 13px;">${p.name}</div><div style="font-size: 11px; color: #059669; font-weight: 700;">${p.price.toLocaleString()} دج / م²</div></div>
-                <button class="btn btn-danger" style="padding: 4px 8px; font-size: 10px;" onclick="deletePlan('${p.id}')"><i class="fa-solid fa-trash"></i></button>
+                <div>
+                    <div style="font-weight: 700; font-size: 13px;">${p.name}</div>
+                    <div style="font-size: 11px; color: #059669; font-weight: 700;">
+                        تجزئة: ${p.price.toLocaleString()} دج/م²
+                        ${p.wholesalePrice ? `<span style="color: #2563eb; margin-right: 10px;">| جملة: ${p.wholesalePrice.toLocaleString()} دج/م²</span>` : ''}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn btn-primary" style="padding: 4px 8px; font-size: 10px;" onclick="openPlanModal('${p.id}')"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 10px;" onclick="deletePlan('${p.id}')"><i class="fa-solid fa-trash"></i></button>
+                </div>
             </div>
         `).join('');
     }
 
-    function openPlanModal() {
-        openModal('إضافة نوع زجاج', `
-            <form onsubmit="savePlan(event)" style="display: flex; flex-direction: column; gap: 14px;">
-                <div><label>اسم النوع</label><input type="text" id="plan-name" required></div>
-                <div><label>سعر المتر المربع</label><input type="number" id="plan-price" required></div>
+     function openPlanModal(planId = null) {
+        const plan = planId ? db.settings.plans.find(p => p.id === planId) : null;
+        
+        openModal(planId ? 'تعديل نوع الزجاج' : 'إضافة نوع زجاج', `
+            <form onsubmit="savePlan(event, ${planId ? `'${planId}'` : 'null'})" style="display: flex; flex-direction: column; gap: 14px;">
+                <div><label>اسم النوع</label><input type="text" id="plan-name" required value="${plan ? plan.name : ''}"></div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>سعر التجزئة (دج/م²)</label>
+                        <input type="number" step="any" id="plan-price" required value="${plan ? plan.price : ''}">
+                    </div>
+                    <div>
+                        <label>سعر الجملة (دج/م²) - اختياري</label>
+                        <input type="number" step="any" id="plan-wholesale-price" value="${plan && plan.wholesalePrice ? plan.wholesalePrice : ''}" placeholder="اتركه فارغاً إن لم يوجد">
+                    </div>
+                </div>
+
                 <button type="submit" class="btn btn-success" style="width: 100%; padding: 14px;">حفظ</button>
             </form>
         `);
     }
 
-    function savePlan(e) {
+    function savePlan(e, planId = null) {
         e.preventDefault();
-        db.settings.plans.push({ id: 'plan-' + Date.now(), name: document.getElementById('plan-name').value, price: parseFloat(document.getElementById('plan-price').value), days: 1 });
-        saveDB(); closeModal(); renderPlansList(); renderGlassTypesSelect();
-    }
+        const name = document.getElementById('plan-name').value;
+        const price = parseFloat(document.getElementById('plan-price').value);
+        const wholesalePrice = parseFloat(document.getElementById('plan-wholesale-price').value) || 0;
 
-    function deletePlan(id) {
-        db.settings.plans = db.settings.plans.filter(p => p.id !== id);
-        saveDB(); renderPlansList();
+        if (planId) {
+            // تعديل نوع موجود
+            const plan = db.settings.plans.find(p => p.id === planId);
+            if (plan) {
+                plan.name = name;
+                plan.price = price;
+                plan.wholesalePrice = wholesalePrice;
+            }
+        } else {
+            // إضافة نوع جديد
+            db.settings.plans.push({ 
+                id: 'plan-' + Date.now(), 
+                name: name, 
+                price: price, 
+                wholesalePrice: wholesalePrice 
+            });
+        }
+        
+        saveDB(); 
+        closeModal(); 
+        renderPlansList(); 
+        renderGlassTypesSelect();
+        showToast('✅ تم حفظ نوع الزجاج', 'success');
     }
 
     function openProductModal(productId = null) {
