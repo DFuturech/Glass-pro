@@ -1023,54 +1023,39 @@
     function payDebt(clientId) {
         const client = db.members.find(m => m.id === clientId);
         
+        // الحساب الموحد الجديد: 
+        // نجمع (سعر الفاتورة) فقط، ثم نطرح (المبلغ المدفوع داخل الفاتورة).
+        // نتجاهل تماماً أي سجل "تسديد دين" لأنه سبب التضارب.
+        
         let totalInvoices = 0;
         let totalPaid = 0;
         
-        // 1. جمع الفواتير والمدفوعات
         db.payments.forEach(p => {
-            if (p.clientId === clientId) {
-                if (p.type === 'دين') {
-                    totalInvoices += p.amount;
-                    totalPaid += (p.paid || 0);
-                } else if (p.type === 'تسديد دين') {
-                    totalPaid += Math.abs(p.amount);
-                }
+            if (p.clientId === clientId && p.type === 'دين') {
+                totalInvoices += p.amount;      // سعر الفاتورة
+                totalPaid += (p.paid || 0);     // المدفوع داخل الفاتورة
             }
         });
 
-        // 2. حساب الصافي
-        let balance = totalInvoices - totalPaid;
+        // الدين الحقيقي
+        let totalDebt = totalInvoices - totalPaid;
         
-        // تحديد النص واللون بناءً على الرصيد
-        let titleText = "";
-        let color = "";
-        
-        if (balance > 0) {
-            titleText = `إجمالي الدين المتبقي: ${balance.toLocaleString()} دج`;
-            color = "#ef4444"; // أحمر (مدين لنا)
-        } else if (balance < 0) {
-            titleText = `الرصيد الدائن (دفع مسبق): ${Math.abs(balance).toLocaleString()} دج`;
-            color = "#10b981"; // أخضر (له رصيد)
-        } else {
-            titleText = `الحساب مسدد بالكامل: 0 دج`;
-            color = "#6b7280"; // رمادي
-        }
+        if (totalDebt < 0) totalDebt = 0;
 
         openModal(`حساب: ${client.name}`, `
             <div style="text-align: center; margin-bottom: 20px;">
-                <h3 style="color: ${color}; font-size: 20px;">${titleText}</h3>
+                <h3 style="color: #ef4444; font-size: 20px;">إجمالي الدين المتبقي: ${totalDebt.toLocaleString()} دج</h3>
             </div>
             
             <form onsubmit="settleDebt(event, '${clientId}')">
                 <div style="margin-bottom: 16px;">
                     <label>المبلغ المدفوع</label>
-                    <input type="number" step="any" id="pay-amount" min="1" required placeholder="أدخل المبلغ">
+                    <input type="number" step="any" id="pay-amount" min="1" max="${totalDebt}" required placeholder="أدخل المبلغ">
                 </div>
                 <button type="submit" class="btn btn-success" style="width: 100%; padding: 14px;">تسجيل الدفع</button>
             </form>
         `);
     }
-
     function settleDebt(e, clientId) {
         e.preventDefault();
         const amount = parseFloat(document.getElementById('pay-amount').value);
@@ -1413,7 +1398,7 @@
         processSale(total, details, clientId, true);
     }
 
-    function printInvoice(sale) {
+     function printInvoice(sale) {
         let clientName = "Client Divers";
         if (sale.clientId) {
             const client = db.members.find(m => m.id === sale.clientId);
@@ -1441,12 +1426,7 @@
 
                 let unitPriceVal = item.type === 'glass' ? item.basePrice : (item.price / item.qty);
                 let unitPriceStr = unitPriceVal.toFixed(2);
-
-                let pricePerM2Str = '-';
-                if (item.area && item.area > 0) {
-                    pricePerM2Str = (unitPriceVal / item.area).toFixed(2);
-                }
-
+                let pricePerM2Str = item.area && item.area > 0 ? (unitPriceVal / item.area).toFixed(2) : '-';
                 let totalLineAmount = (unitPriceVal * item.qty).toFixed(2);
 
                 rowsHtml += `
@@ -1467,29 +1447,25 @@
         }
 
         const invoiceTitle = db.settings.invoiceTitle || 'FACTURE';
-        
-        let rawNumber = sale.id;
-        if (rawNumber.includes('-')) {
-            rawNumber = rawNumber.split('-').pop(); 
-        }
-
+        let rawNumber = sale.id.includes('-') ? sale.id.split('-').pop() : sale.id;
         const shopAddress = (db.settings.address && db.settings.address !== '0') ? db.settings.address : '';
         const shopPhone = (db.settings.phone && db.settings.phone !== '0') ? db.settings.phone : '';
 
-        // حساب الدين القديم لحظياً (الفواتير السابقة - المدفوعات السابقة) قبل هذه الفاتورة
-              // حساب الرصيد القديم (دين أو دفعة مقدمة)
+        // حساب الدين القديم (بناءً على الفواتير السابقة فقط)
         let calculatedOldDebt = 0;
         if (sale.clientId) {
             let inv = 0, paid = 0;
             db.payments.forEach(p => {
+                // نستثني الفاتورة الحالية
                 if (p.clientId === sale.clientId && p.id !== sale.id) {
-                    if (p.type === 'دين') inv += p.amount;
-                    if (p.type === 'دين') paid += (p.paid || 0);
-                    if (p.type === 'تسديد دين') paid += Math.abs(p.amount);
+                    if (p.type === 'دين') {
+                        inv += p.amount;
+                        paid += (p.paid || 0);
+                    }
+                    // لا نحسب "تسديد دين" هنا لأننا نستخدم المدفوع داخل الفاتورة
                 }
             });
-            // إذا كانت الدفعات أكبر من الديون، الرصيد سالب (دائن)
-            calculatedOldDebt = inv - paid; 
+            calculatedOldDebt = Math.max(0, inv - paid);
         }
 
         const invoiceHtml = `
@@ -1521,12 +1497,8 @@
                         ${shopAddress ? `<div>${shopAddress}</div>` : ''}
                         ${shopPhone ? `<div>${shopPhone}</div>` : ''}
                     </div>
-                    <div class="invoice-number">
-                        ${invoiceTitle} N°: ${rawNumber}
-                    </div>
-                    <div class="invoice-date">
-                        Date: ${sale.date}
-                    </div>
+                    <div class="invoice-number">${invoiceTitle} N°: ${rawNumber}</div>
+                    <div class="invoice-date">Date: ${sale.date}</div>
                 </div>
                 <div class="divider"></div>
                 <div class="client-row">
@@ -1552,7 +1524,6 @@
                 <table class="summary-table">
                     <tr>
                         <td style="text-align: left; width: 50%; font-weight: bold;">SOLDE UNITAL</td>
-                        <!-- سعر الفاتورة الحالية -->
                         <td style="text-align: left; font-weight: bold;">${sale.amount.toFixed(2)} DZD</td>
                     </tr>
                     <tr>
@@ -1560,20 +1531,16 @@
                         <td style="text-align: left; font-weight: bold;">${(sale.paid || 0).toFixed(2)} DZD</td>
                     </tr>
                     <tr>
-                        <td style="text-align: left; color: ${calculatedOldDebt < 0 ? '#10b981' : '#dc2626'}; font-weight: bold;">
-                            ${calculatedOldDebt < 0 ? 'CRÉDIT (رصيد)' : 'DETTE RESTANTE'}
-                        </td>
-                        <td style="text-align: left; color: ${calculatedOldDebt < 0 ? '#10b981' : '#dc2626'}; font-weight: bold;">
-                            ${calculatedOldDebt < 0 ? Math.abs(calculatedOldDebt).toFixed(2) : (sale.oldDebt || 0).toFixed(2)} DZD
-                        </td>
+                        <td style="text-align: left; color: #dc2626; font-weight: bold;">DETTE RESTANTE</td>
+                        <td style="text-align: left; color: #dc2626; font-weight: bold;">${calculatedOldDebt.toFixed(2)} DZD</td>
                     </tr>
                     <tr>
                         <td style="text-align: left; background-color: #f3f4f6; font-weight: 900;">TOTAL</td>
                         <td style="text-align: left; background-color: #f3f4f6; font-weight: 900;">
                             ${(() => {
                                 const remaining = (sale.amount + calculatedOldDebt) - (sale.paid || 0);
-                                if (remaining > 0) return `- ${remaining.toFixed(2)} DZD`; // دين (سالب)
-                                if (remaining < 0) return `${Math.abs(remaining).toFixed(2)} DZD (Crédit)`; // رصيد (موجب)
+                                if (remaining > 0) return `- ${remaining.toFixed(2)} DZD`; 
+                                if (remaining < 0) return `${Math.abs(remaining).toFixed(2)} DZD (Crédit)`; 
                                 return `0.00 DZD`;
                             })()}
                         </td>
