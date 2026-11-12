@@ -805,25 +805,141 @@
                     <div style="font-size: 22px; font-weight: 900; color: #1f2937;">${totalRev.toLocaleString()}</div>
                     <div style="font-size: 11px; color: #6b7280;">${db.settings.currency}</div>
                 </div>
+                
+                <!-- كارت إيرادات الفترة المحددة (مخفي افتراضياً) -->
+                <div id="specific-day-card" class="inner-card" style="display: none; border: 2px solid #f59e0b; background: #fffbeb;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 12px; color: #d97706; font-weight: 700;" id="specific-card-title">إيرادات الفترة المحددة</span>
+                        <i class="fa-solid fa-calendar-day" style="color: #f59e0b;"></i>
+                    </div>
+                    <div style="font-size: 22px; font-weight: 900; color: #d97706;" id="specific-day-total">0</div>
+                    <div style="font-size: 11px; color: #d97706;">${db.settings.currency}</div>
+                </div>
             </div>
+            
             <div class="inner-card" style="margin-bottom: 20px;">
-                <h3 style="font-size: 14px; font-weight: 800; margin-bottom: 14px; color: #1f2937;"><i class="fa-solid fa-chart-column" style="color: #6366f1;"></i> إيرادات آخر 7 أيام</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                    <h3 style="font-size: 14px; font-weight: 800; color: #1f2937;"><i class="fa-solid fa-chart-column" style="color: #6366f1;"></i> إيرادات الفترة المحددة</h3>
+                    
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <!-- حقل التاريخ المفرد (يوم محدد) -->
+                        <div id="single-date-container" style="display: none; gap: 5px;">
+                            <input type="date" id="specific-date-filter" style="width: auto; padding: 4px 10px; font-size: 12px; border-radius: 8px;">
+                        </div>
+                        
+                        <!-- حقول الفترة (من - إلى) -->
+                        <div id="range-date-container" style="display: none; gap: 5px; align-items: center;">
+                            <span style="font-size: 12px; color: #4b5563;">من:</span>
+                            <input type="date" id="date-from-filter" style="width: auto; padding: 4px 10px; font-size: 12px; border-radius: 8px;">
+                            <span style="font-size: 12px; color: #4b5563;">إلى:</span>
+                            <input type="date" id="date-to-filter" style="width: auto; padding: 4px 10px; font-size: 12px; border-radius: 8px;">
+                        </div>
+
+                        <button type="button" id="apply-filter-btn" class="btn btn-warning" style="padding: 4px 10px; font-size: 12px; display: none;" onclick="renderRevenueChart()">تأكيد</button>
+                        
+                        <select id="chart-days-filter" onchange="toggleDateInput(this.value)" style="width: auto; padding: 4px 10px; font-size: 12px; border-radius: 8px; cursor: pointer;">
+                            <option value="7">آخر 7 أيام</option>
+                            <option value="14">آخر 14 يوماً</option>
+                            <option value="30">آخر 30 يوماً</option>
+                            <option value="custom">يوم محدد...</option>
+                            <option value="range">فترة مخصصة (من - إلى)...</option>
+                        </select>
+                    </div>
+                </div>
                 <div style="height: 260px; position: relative;"><canvas id="revenueChart"></canvas></div>
             </div>
         `;
         setTimeout(renderRevenueChart, 100);
     }
 
+    function toggleDateInput(val) {
+        const singleContainer = document.getElementById('single-date-container');
+        const rangeContainer = document.getElementById('range-date-container');
+        const applyBtn = document.getElementById('apply-filter-btn');
+        const dateInput = document.getElementById('specific-date-filter');
+        const dateFrom = document.getElementById('date-from-filter');
+        const dateTo = document.getElementById('date-to-filter');
+        
+        // إخفاء الكل أولاً
+        singleContainer.style.display = 'none';
+        rangeContainer.style.display = 'none';
+        applyBtn.style.display = 'none';
+        
+        if (val === 'custom') {
+            singleContainer.style.display = 'flex';
+            applyBtn.style.display = 'block';
+            if (!dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+        } else if (val === 'range') {
+            rangeContainer.style.display = 'flex';
+            applyBtn.style.display = 'block';
+            if (!dateFrom.value) dateFrom.value = new Date().toISOString().split('T')[0];
+            if (!dateTo.value) dateTo.value = new Date().toISOString().split('T')[0];
+        }
+        
+        // إذا كانت فترة جاهزة (7، 14، 30)، سيتم تحديث الرسم فوراً
+        if (val !== 'custom' && val !== 'range') {
+            renderRevenueChart();
+        }
+    }
+
     function renderRevenueChart() {
         const ctx = document.getElementById('revenueChart');
         if (!ctx) return;
+        
+        const filterVal = document.getElementById('chart-days-filter').value;
+        const dateInput = document.getElementById('specific-date-filter');
+        const dateFrom = document.getElementById('date-from-filter');
+        const dateTo = document.getElementById('date-to-filter');
+        const specificCard = document.getElementById('specific-day-card');
+        const specificTitle = document.getElementById('specific-card-title');
+        const specificTotal = document.getElementById('specific-day-total');
+        
         const labels = [], revenueData = [];
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date(); d.setDate(d.getDate() - i);
-            const dateStr = d.toISOString().split('T')[0];
-            labels.push(d.toLocaleDateString('ar-EG', { weekday: 'short' }));
-            revenueData.push(db.payments.filter(p => p.date.startsWith(dateStr)).reduce((s, p) => s + p.amount, 0));
+        
+        if (filterVal === 'custom' && dateInput.value) {
+            // يوم واحد
+            const selectedDate = dateInput.value;
+            const dayTotal = db.payments.filter(p => p.date.startsWith(selectedDate)).reduce((s, p) => s + p.amount, 0);
+            
+            labels.push(selectedDate);
+            revenueData.push(dayTotal);
+            
+            specificCard.style.display = 'block';
+            specificTitle.innerText = 'إيرادات اليوم المحدد';
+            specificTotal.innerText = dayTotal.toLocaleString();
+            
+        } else if (filterVal === 'range' && dateFrom.value && dateTo.value) {
+            // فترة مخصصة (من - إلى)
+            const start = new Date(dateFrom.value);
+            const end = new Date(dateTo.value);
+            let rangeTotal = 0;
+            
+            // حلقة تكرار من تاريخ البداية إلى النهاية
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                const dayTotal = db.payments.filter(p => p.date.startsWith(dateStr)).reduce((s, p) => s + p.amount, 0);
+                
+                labels.push(d.toLocaleDateString('ar-DZ', { month: 'numeric', day: 'numeric' }));
+                revenueData.push(dayTotal);
+                rangeTotal += dayTotal;
+            }
+            
+            specificCard.style.display = 'block';
+            specificTitle.innerText = 'إجمالي الفترة المحددة';
+            specificTotal.innerText = rangeTotal.toLocaleString();
+            
+        } else {
+            // الفترات الجاهزة (7، 14، 30)
+            specificCard.style.display = 'none';
+            const numDays = parseInt(filterVal) || 7;
+            for (let i = numDays - 1; i >= 0; i--) {
+                const d = new Date(); d.setDate(d.getDate() - i);
+                const dateStr = d.toISOString().split('T')[0];
+                labels.push(d.toLocaleDateString('ar-DZ', { month: 'numeric', day: 'numeric' })); 
+                revenueData.push(db.payments.filter(p => p.date.startsWith(dateStr)).reduce((s, p) => s + p.amount, 0));
+            }
         }
+        
         if (revenueChartInstance) revenueChartInstance.destroy();
         revenueChartInstance = new Chart(ctx, {
             type: 'bar',
@@ -831,7 +947,7 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
     }
-
+    
     function renderMembers() {
         const container = document.getElementById('members-container');
         if (!container) return;
@@ -1404,7 +1520,7 @@
             sale.items.forEach((item, index) => { 
                 let areaStr = '-';
                 let dimensionStr = '-';
-                let displayName = item.name;
+                let displayName = item.name ? item.name.replace(' (جملة)', '') : item.name;
 
                 if (item.width && item.height) {
                     dimensionStr = `${item.width} × ${item.height}`;
