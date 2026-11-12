@@ -966,31 +966,29 @@
         showToast('✅ تم تعديل بيانات الزبون بنجاح', 'success');
     }
 
-        function saveInitialBalance(e, clientId) {
+    function saveInitialBalance(e, clientId) {
         e.preventDefault();
         const type = document.getElementById('initial-balance-type').value;
         const amount = parseFloat(document.getElementById('initial-balance-amount').value);
         
         if (amount <= 0) return;
 
-        const client = db.members.find(m => m.id === clientId);
-
-        // نقوم بإنشاء فاتورة دين وهمية تحمل الرصيد الافتتاحي
+        // إنشاء السجل بالاسم الصحيح
         const initialSale = {
             id: 'SOLDE-' + Math.floor(Math.random() * 9000 + 1000),
             date: new Date().toLocaleString('sv-SE').slice(0, 16),
-            type: type === 'debt' ? 'دين' : 'تسديد دين',
+            type: type === 'debt' ? 'رصيد افتتاحي' : 'رصيد افتتاحي_دائن',
             details: type === 'debt' ? 'رصيد افتتاحي (دين سابق)' : 'رصيد افتتاحي (دفعة مقدمة)',
-            amount: type === 'debt' ? amount : -amount,
+            amount: amount,
             clientId: clientId,
-            paid: type === 'debt' ? 0 : amount, // إذا كان رصيداً دائناً، نعتبره مدفوعاً بالكامل
+            paid: 0, 
             oldDebt: 0,
             by: db.currentUser.name,
             items: [{
                 name: type === 'debt' ? 'رصيد افتتاحي سابق' : 'دفعة مقدمة سابقة',
                 qty: 1,
                 price: amount,
-                type: 'product' // نعتبرها منتج حتى لا تظهر في تقارير الزجاج
+                type: 'product' 
             }]
         };
 
@@ -1023,34 +1021,43 @@
     function payDebt(clientId) {
         const client = db.members.find(m => m.id === clientId);
         
-        // الحساب الموحد الجديد: 
-        // نجمع (سعر الفاتورة) فقط، ثم نطرح (المبلغ المدفوع داخل الفاتورة).
-        // نتجاهل تماماً أي سجل "تسديد دين" لأنه سبب التضارب.
-        
         let totalInvoices = 0;
         let totalPaid = 0;
         
         db.payments.forEach(p => {
-            if (p.clientId === clientId && p.type === 'دين') {
-                totalInvoices += p.amount;      // سعر الفاتورة
-                totalPaid += (p.paid || 0);     // المدفوع داخل الفاتورة
+            if (p.clientId === clientId) {
+                // 1. الديون (فواتير + رصيد افتتاحي مدين)
+                if (p.type === 'دين' || p.type === 'رصيد افتتاحي') {
+                    totalInvoices += p.amount;
+                }
+                // 2. المدفوعات (داخل الفواتير + تسديدات مستقلة + رصيد دائن)
+                totalPaid += (p.paid || 0);
+                
+                if (p.type === 'تسديد دين') {
+                    totalPaid += Math.abs(p.amount);
+                }
+                if (p.type === 'رصيد افتتاحي_دائن') {
+                    totalPaid += p.amount;
+                }
             }
         });
 
-        // الدين الحقيقي
         let totalDebt = totalInvoices - totalPaid;
-        
-        if (totalDebt < 0) totalDebt = 0;
+        let isCredit = totalDebt < 0;
+        let displayAmount = Math.abs(totalDebt);
 
         openModal(`حساب: ${client.name}`, `
             <div style="text-align: center; margin-bottom: 20px;">
-                <h3 style="color: #ef4444; font-size: 20px;">إجمالي الدين المتبقي: ${totalDebt.toLocaleString()} دج</h3>
+                <h3 style="color: ${isCredit ? '#10b981' : '#ef4444'}; font-size: 20px;">
+                    ${isCredit ? 'الرصيد الدائن (دفع مسبق): ' : 'إجمالي الدين المتبقي: '} 
+                    ${displayAmount.toLocaleString()} دج
+                </h3>
             </div>
             
             <form onsubmit="settleDebt(event, '${clientId}')">
                 <div style="margin-bottom: 16px;">
                     <label>المبلغ المدفوع</label>
-                    <input type="number" step="any" id="pay-amount" min="1" max="${totalDebt}" required placeholder="أدخل المبلغ">
+                    <input type="number" step="any" id="pay-amount" min="1" required placeholder="أدخل المبلغ">
                 </div>
                 <button type="submit" class="btn btn-success" style="width: 100%; padding: 14px;">تسجيل الدفع</button>
             </form>
@@ -1063,20 +1070,20 @@
 
         let remainingPayment = amount;
         
-        // نبحث عن فواتير الدين الخاصة بهذا الزبون (الأقدم أولاً)
-        const debts = db.payments.filter(p => p.clientId === clientId && p.type === 'دين').reverse();
+        // البحث عن الديون لتسديدها (الفواتير والرصيد الافتتاحي)
+        const debts = db.payments.filter(p => 
+            p.clientId === clientId && (p.type === 'دين' || p.type === 'رصيد افتتاحي')
+        ).reverse();
 
         for (let i = 0; i < debts.length; i++) {
             const sale = debts[i];
-            const saleDebt = (sale.amount + (sale.oldDebt || 0)) - (sale.paid || 0);
+            const saleDebt = sale.amount - (sale.paid || 0);
             
             if (saleDebt > 0) {
-                // إذا كان المبلغ المدفوع يكفي لتصفية هذه الفاتورة
                 if (remainingPayment >= saleDebt) {
-                    sale.paid = (sale.paid || 0) + saleDebt; // نزيد المدفوع ليصبح مساوياً للإجمالي
+                    sale.paid = (sale.paid || 0) + saleDebt;
                     remainingPayment -= saleDebt;
                 } else {
-                    // إذا كان المبلغ المدفوع لا يكفي، نضيفه للمدفوع وننهي العملية
                     sale.paid = (sale.paid || 0) + remainingPayment;
                     remainingPayment = 0;
                     break;
@@ -1089,7 +1096,7 @@
         renderPayments(); 
         renderDashboard();
         renderMembers();
-        showToast('✅ تم تسجيل الدفعة وتحديث الفواتير', 'success');
+        showToast('✅ تم تسجيل الدفعة بنجاح', 'success');
     }
 
     function updateClientSelect() {
@@ -1324,7 +1331,6 @@
             finalClientId = document.getElementById('debt-client-id').value;
             if (!finalClientId) { showToast('اختر زبون', 'warning'); return false; }
             
-            // المبلغ المدفوع في هذه الفاتورة الجديدة
             paidAmount = parseFloat(document.getElementById('partial-payment').value) || 0;
             if (paidAmount > total) paidAmount = total;
             remainingAmount = total - paidAmount;
@@ -1332,7 +1338,6 @@
             paidAmount = total;
         }
 
-        // خصم الكميات من المخزون
         cart.forEach(item => { 
             if (item.type === 'product') {
                 const p = db.products.find(prod => prod.id === item.id); 
@@ -1340,35 +1345,23 @@
             }
         });
 
-        // إنشاء بيانات الفاتورة
         const saleData = { 
             id: 'INV-' + Math.floor(Math.random() * 9000 + 1000), 
             date: new Date().toLocaleString('sv-SE').slice(0, 16), 
             type: method === 'debt' ? 'دين' : 'نقدي', 
             details: details, 
-            amount: total, // هذا سعر الفاتورة الحالية فقط
+            amount: total, 
             clientId: finalClientId,
             by: db.currentUser.name,
             paid: paidAmount,
             remaining: remainingAmount,
-            oldDebt: 0, // لا نحفظ الدين القديم هنا لتجنب التكرار
+            oldDebt: 0, // <--- هذا هو التعديل: لا نحفظ ديوناً قديمة هنا لتجنب التراكم
             items: JSON.parse(JSON.stringify(cart))
         };
 
         db.payments.unshift(saleData);
         
-        // إذا كان ديناً ودفع جزءاً منه، نسجل الدفعة
-        if (method === 'debt' && paidAmount > 0) {
-            db.payments.unshift({ 
-                id: 'PAY-' + Date.now(), 
-                date: new Date().toLocaleString('sv-SE').slice(0, 16), 
-                type: 'تسديد دين', 
-                details: `دفعة أولى لفاتورة ${saleData.id}`, 
-                amount: -paidAmount, 
-                clientId: finalClientId, 
-                by: db.currentUser.name 
-            });
-        }
+        // تم حذف السطر الذي كان ينشئ "سجل تسديد دين" منفصل هنا
 
         saveDB(); 
         cart = []; 
@@ -1398,7 +1391,7 @@
         processSale(total, details, clientId, true);
     }
 
-     function printInvoice(sale) {
+    function printInvoice(sale) {
         let clientName = "Client Divers";
         if (sale.clientId) {
             const client = db.members.find(m => m.id === sale.clientId);
@@ -1451,21 +1444,30 @@
         const shopAddress = (db.settings.address && db.settings.address !== '0') ? db.settings.address : '';
         const shopPhone = (db.settings.phone && db.settings.phone !== '0') ? db.settings.phone : '';
 
-        // حساب الدين القديم (بناءً على الفواتير السابقة فقط)
+        // =========================================================
+        // تصحيح الحساب: نعتمد فقط على صافي الفواتير السابقة (inv - paid).
+        // نتجاهل أي سجلات دفع مستقلة (تسديد دين) لتجنب ظهور رصيد وهمي.
+        // =========================================================
         let calculatedOldDebt = 0;
         if (sale.clientId) {
-            let inv = 0, paid = 0;
+            let inv = 0;
+            let paid = 0;
+            
             db.payments.forEach(p => {
                 // نستثني الفاتورة الحالية
                 if (p.clientId === sale.clientId && p.id !== sale.id) {
-                    if (p.type === 'دين') {
+                    // نجمع الديون السابقة فقط
+                    if (p.type === 'دين' || p.type === 'رصيد افتتاحي') {
                         inv += p.amount;
                         paid += (p.paid || 0);
                     }
-                    // لا نحسب "تسديد دين" هنا لأننا نستخدم المدفوع داخل الفاتورة
+                    // الرصيد الدائن السابق (دفعة مقدمة)
+                    if (p.type === 'رصيد افتتاحي_دائن') {
+                        paid += p.amount;
+                    }
                 }
             });
-            calculatedOldDebt = Math.max(0, inv - paid);
+            calculatedOldDebt = inv - paid;
         }
 
         const invoiceHtml = `
@@ -1530,17 +1532,28 @@
                         <td style="text-align: left; font-weight: bold;">VERSEMENT</td>
                         <td style="text-align: left; font-weight: bold;">${(sale.paid || 0).toFixed(2)} DZD</td>
                     </tr>
+                    
+                    ${calculatedOldDebt > 0 ? `
                     <tr>
                         <td style="text-align: left; color: #dc2626; font-weight: bold;">DETTE RESTANTE</td>
                         <td style="text-align: left; color: #dc2626; font-weight: bold;">${calculatedOldDebt.toFixed(2)} DZD</td>
                     </tr>
+                    ` : ''}
+
+                    ${calculatedOldDebt < 0 ? `
+                    <tr>
+                        <td style="text-align: left; color: #10b981; font-weight: bold;">CRÉDIT</td>
+                        <td style="text-align: left; color: #10b981; font-weight: bold;">${Math.abs(calculatedOldDebt).toFixed(2)} DZD</td>
+                    </tr>
+                    ` : ''}
+
                     <tr>
                         <td style="text-align: left; background-color: #f3f4f6; font-weight: 900;">TOTAL</td>
                         <td style="text-align: left; background-color: #f3f4f6; font-weight: 900;">
                             ${(() => {
-                                const remaining = (sale.amount + calculatedOldDebt) - (sale.paid || 0);
-                                if (remaining > 0) return `- ${remaining.toFixed(2)} DZD`; 
-                                if (remaining < 0) return `${Math.abs(remaining).toFixed(2)} DZD (Crédit)`; 
+                                const finalTotal = (sale.amount + calculatedOldDebt) - (sale.paid || 0);
+                                if (finalTotal > 0) return `- ${finalTotal.toFixed(2)} DZD`;
+                                if (finalTotal < 0) return `${Math.abs(finalTotal).toFixed(2)} DZD (Crédit)`;
                                 return `0.00 DZD`;
                             })()}
                         </td>
@@ -1571,7 +1584,7 @@
             printFrame.contentWindow.print();
         }, 500);
     }
-    function renderInventory() {
+        function renderInventory() {
         const body = document.getElementById('inventory-table-body');
         if (!body) return;
         body.innerHTML = db.products.map(p => `
