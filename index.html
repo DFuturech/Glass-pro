@@ -262,21 +262,39 @@
             <div class="window-body">
                 
                 <div class="inner-card" style="border: 2px solid #f59e0b; margin-bottom: 20px;">
-                    <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 16px; color: #1f2937;"><i class="fa-solid fa-ruler-combined" style="color: #f59e0b;"></i> زجاج بالمقاس</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                        <div><label>العرض (سم) *</label><input type="number" id="pos-width" min="1" placeholder="50" oninput="calcGlassPreview()"></div>
-                        <div><label>الطول (سم) *</label><input type="number" id="pos-height" min="1" placeholder="80" oninput="calcGlassPreview()"></div>
-                        <div><label>الكمية *</label><input type="number" id="pos-qty" value="1" min="1" oninput="calcGlassPreview()"></div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px;">
-                        <div><label>نوع الزجاج</label><select id="pos-glass-type" onchange="calcGlassPreview()"></select></div>
-                        <div><label>تكلفة القص / قطعة</label><input type="number" id="pos-cut-cost" value="0" min="0" oninput="calcGlassPreview()"></div>
-                    </div>
-                    <div style="text-align: center; margin-bottom: 16px; padding: 10px; background: #fffbeb; border-radius: 8px; font-weight: 800; color: #d97706;">
-                        سعر القطعة: <span id="glass-preview-price">0</span> دج
-                    </div>
-                    <button class="btn btn-warning" style="width: 100%; padding: 12px;" onclick="addGlassToCart()"><i class="fa-solid fa-plus"></i> إضافة زجاج للفاتورة</button>
-                </div>
+    <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 16px; color: #1f2937;"><i class="fa-solid fa-ruler-combined" style="color: #f59e0b;"></i> زجاج بالمقاس</h3>
+    
+    <!-- السطر الأول: العرض، الطول، الكمية -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <div><label>العرض (سم) *</label><input type="number" id="pos-width" min="1" placeholder="50" oninput="calcGlassPreview()"></div>
+        <div><label>الطول (سم) *</label><input type="number" id="pos-height" min="1" placeholder="80" oninput="calcGlassPreview()"></div>
+        <div><label>الكمية *</label><input type="number" id="pos-qty" value="1" min="1" oninput="calcGlassPreview()"></div>
+    </div>
+    
+    <!-- السطر الثاني: نوع الزجاج، البحث، تكلفة القص -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 16px; align-items: end;">
+        <div>
+            <label>نوع الزجاج</label>
+            <select id="pos-glass-type" onchange="calcGlassPreview()"></select>
+        </div>
+        <div style="position: relative;">
+            <label>بحث سريع</label>
+            <input type="text" id="pos-glass-search-input" oninput="filterGlassSelect()" placeholder="اكتب للبحث..." style="padding-right: 35px; font-size: 12px;">
+            <i class="fa-solid fa-search" style="position: absolute; right: 12px; top: 37px; color: #9ca3af; font-size: 12px;"></i>
+        </div>
+        <div>
+            <label>تكلفة القص / قطعة</label>
+            <input type="number" id="pos-cut-cost" value="0" min="0" oninput="calcGlassPreview()">
+        </div>
+    </div>
+    
+    <!-- السعر ومعاينة القطعة -->
+    <div style="text-align: center; margin-bottom: 16px; padding: 10px; background: #fffbeb; border-radius: 8px; font-weight: 800; color: #d97706;">
+        سعر القطعة: <span id="glass-preview-price">0.00</span> دج
+    </div>
+    
+    <button class="btn btn-warning" style="width: 100%; padding: 12px;" onclick="addGlassToCart()"><i class="fa-solid fa-plus"></i> إضافة زجاج للفاتورة</button>
+</div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
                     <div style="display: flex; gap: 10px; flex: 1; min-width: 250px;">
@@ -317,10 +335,20 @@
             <div class="window-header"><div class="window-dots"><div class="window-dot close" onclick="closeAllWindows()"></div><div class="window-dot minimize"></div><div class="window-dot maximize"></div></div><div class="window-title">📦 إدارة المخزون وأنواع الزجاج</div><div style="width: 60px;"></div></div>
             <div class="window-body">
                 
+                <div style="margin-bottom: 16px; position: relative;">
+    <input type="text" id="inventory-search" oninput="renderInventory()" placeholder="بحث عن منتج بالاسم..." style="padding-right: 40px; background: #fff;">
+    <i class="fa-solid fa-search" style="position: absolute; right: 14px; top: 12px; color: #9ca3af;"></i>
+</div>
+
                 <div class="inner-card" style="margin-bottom: 24px; border: 1px solid #8b5cf6;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h3 style="font-size: 14px; font-weight: 700; color: #1f2937;"><i class="fa-solid fa-tags" style="color: #8b5cf6;"></i> أنواع الزجاج (سعر المتر المربع)</h3>
                         <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; background: #8b5cf6;" onclick="openPlanModal()"><i class="fa-solid fa-plus"></i> إضافة</button>
+                    </div>
+                    <!-- مربع البحث الجديد لأنواع الزجاج -->
+                    <div style="margin-bottom: 12px; position: relative;">
+                        <input type="text" id="plans-search" oninput="renderPlansList()" placeholder="بحث عن نوع زجاج..." style="padding-right: 40px; background: #fff;">
+                        <i class="fa-solid fa-search" style="position: absolute; right: 14px; top: 12px; color: #9ca3af;"></i>
                     </div>
                     <div id="plans-list-container"></div>
                 </div>
@@ -776,9 +804,32 @@
     function renderDashboard() {
         const container = document.getElementById('dashboard-content');
         if (!container) return;
+        
+        // الحساب الجديد: الإيرادات الفعلية = (مبيعات نقدية) + (دفعات مقدمة داخل الفواتير) + (دفعات تسديد سابقة) - (مرتجعات)
+        let totalReceived = 0;
+        
+        db.payments.forEach(p => {
+            if (p.type === 'نقدي') {
+                totalReceived += p.amount; 
+            } else if (p.type === 'دين') {
+                totalReceived += (p.paid || 0); // نأخذ فقط المبلغ المدفوع مسبقاً
+            } else if (p.type === 'تسديد دين') {
+                totalReceived += Math.abs(p.amount);
+            } else if (p.type === 'رصيد افتتاحي_دائن') {
+                // لا نضيف الرصيد الدائن القديم إلى الإيرادات الجديدة، بل هو دين قديم
+            }
+        });
+
+        // حساب مبيعات اليوم (فقط النقدي والدفعات)
         const todayStr = new Date().toISOString().split('T')[0];
-        const todaySales = db.payments.filter(p => p.date.startsWith(todayStr)).reduce((s,p) => s + p.amount, 0);
-        const totalRev = db.payments.reduce((s,p) => s + p.amount, 0);
+        let todaySales = 0;
+        db.payments.forEach(p => {
+            if (p.date.startsWith(todayStr)) {
+                if (p.type === 'نقدي') todaySales += p.amount;
+                else if (p.type === 'دين') todaySales += (p.paid || 0);
+                else if (p.type === 'تسديد دين') todaySales += Math.abs(p.amount);
+            }
+        });
 
         container.innerHTML = `
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
@@ -791,7 +842,7 @@
                 </div>
                 <div class="inner-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-size: 12px; color: #6b7280; font-weight: 600;">مبيعات اليوم</span>
+                        <span style="font-size: 12px; color: #6b7280; font-weight: 600;">المستلم اليوم (الخزينة)</span>
                         <i class="fa-solid fa-cash-register" style="color: #10b981;"></i>
                     </div>
                     <div style="font-size: 22px; font-weight: 900; color: #1f2937;">${todaySales.toLocaleString()}</div>
@@ -799,42 +850,29 @@
                 </div>
                 <div class="inner-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-size: 12px; color: #6b7280; font-weight: 600;">إجمالي الإيرادات</span>
+                        <span style="font-size: 12px; color: #6b7280; font-weight: 600;">إجمالي المستلم (الخزينة)</span>
                         <i class="fa-solid fa-wallet" style="color: #8b5cf6;"></i>
                     </div>
-                    <div style="font-size: 22px; font-weight: 900; color: #1f2937;">${totalRev.toLocaleString()}</div>
+                    <div style="font-size: 22px; font-weight: 900; color: #1f2937;">${totalReceived.toLocaleString()}</div>
                     <div style="font-size: 11px; color: #6b7280;">${db.settings.currency}</div>
-                </div>
-                
-                <!-- كارت إيرادات الفترة المحددة (مخفي افتراضياً) -->
-                <div id="specific-day-card" class="inner-card" style="display: none; border: 2px solid #f59e0b; background: #fffbeb;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-size: 12px; color: #d97706; font-weight: 700;" id="specific-card-title">إيرادات الفترة المحددة</span>
-                        <i class="fa-solid fa-calendar-day" style="color: #f59e0b;"></i>
-                    </div>
-                    <div style="font-size: 22px; font-weight: 900; color: #d97706;" id="specific-day-total">0</div>
-                    <div style="font-size: 11px; color: #d97706;">${db.settings.currency}</div>
                 </div>
             </div>
             
+            <!-- بقية الرسم البياني (تعديل بسيط ليعرض المبالغ المستلمة) -->
             <div class="inner-card" style="margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
                     <h3 style="font-size: 14px; font-weight: 800; color: #1f2937;"><i class="fa-solid fa-chart-column" style="color: #6366f1;"></i> إيرادات الفترة المحددة</h3>
                     
-                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <!-- حقل التاريخ المفرد (يوم محدد) -->
+                    <div style="display: flex; gap: 10px; align-items: center;">
                         <div id="single-date-container" style="display: none; gap: 5px;">
                             <input type="date" id="specific-date-filter" style="width: auto; padding: 4px 10px; font-size: 12px; border-radius: 8px;">
                         </div>
-                        
-                        <!-- حقول الفترة (من - إلى) -->
                         <div id="range-date-container" style="display: none; gap: 5px; align-items: center;">
                             <span style="font-size: 12px; color: #4b5563;">من:</span>
                             <input type="date" id="date-from-filter" style="width: auto; padding: 4px 10px; font-size: 12px; border-radius: 8px;">
                             <span style="font-size: 12px; color: #4b5563;">إلى:</span>
                             <input type="date" id="date-to-filter" style="width: auto; padding: 4px 10px; font-size: 12px; border-radius: 8px;">
                         </div>
-
                         <button type="button" id="apply-filter-btn" class="btn btn-warning" style="padding: 4px 10px; font-size: 12px; display: none;" onclick="renderRevenueChart()">تأكيد</button>
                         
                         <select id="chart-days-filter" onchange="toggleDateInput(this.value)" style="width: auto; padding: 4px 10px; font-size: 12px; border-radius: 8px; cursor: pointer;">
@@ -895,11 +933,24 @@
         const specificTotal = document.getElementById('specific-day-total');
         
         const labels = [], revenueData = [];
+
+        // دالة مساعدة لحساب الإيرادات المستلمة فقط
+        const getDayRevenue = (dateStr) => {
+            let total = 0;
+            db.payments.forEach(p => {
+                if (p.date.startsWith(dateStr)) {
+                    if (p.type === 'نقدي') total += p.amount;
+                    else if (p.type === 'دين') total += (p.paid || 0);
+                    else if (p.type === 'تسديد دين') total += Math.abs(p.amount);
+                }
+            });
+            return total;
+        };
         
         if (filterVal === 'custom' && dateInput.value) {
             // يوم واحد
             const selectedDate = dateInput.value;
-            const dayTotal = db.payments.filter(p => p.date.startsWith(selectedDate)).reduce((s, p) => s + p.amount, 0);
+            const dayTotal = getDayRevenue(selectedDate);
             
             labels.push(selectedDate);
             revenueData.push(dayTotal);
@@ -914,10 +965,9 @@
             const end = new Date(dateTo.value);
             let rangeTotal = 0;
             
-            // حلقة تكرار من تاريخ البداية إلى النهاية
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().split('T')[0];
-                const dayTotal = db.payments.filter(p => p.date.startsWith(dateStr)).reduce((s, p) => s + p.amount, 0);
+                const dayTotal = getDayRevenue(dateStr);
                 
                 labels.push(d.toLocaleDateString('ar-DZ', { month: 'numeric', day: 'numeric' }));
                 revenueData.push(dayTotal);
@@ -936,14 +986,14 @@
                 const d = new Date(); d.setDate(d.getDate() - i);
                 const dateStr = d.toISOString().split('T')[0];
                 labels.push(d.toLocaleDateString('ar-DZ', { month: 'numeric', day: 'numeric' })); 
-                revenueData.push(db.payments.filter(p => p.date.startsWith(dateStr)).reduce((s, p) => s + p.amount, 0));
+                revenueData.push(getDayRevenue(dateStr));
             }
         }
         
         if (revenueChartInstance) revenueChartInstance.destroy();
         revenueChartInstance = new Chart(ctx, {
             type: 'bar',
-            data: { labels, datasets: [{ label: 'الإيرادات', data: revenueData, backgroundColor: 'rgba(99, 102, 241, 0.7)', borderColor: '#6366f1', borderWidth: 2, borderRadius: 8 }] },
+            data: { labels, datasets: [{ label: 'المبالغ المستلمة', data: revenueData, backgroundColor: 'rgba(99, 102, 241, 0.7)', borderColor: '#6366f1', borderWidth: 2, borderRadius: 8 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
     }
@@ -1221,18 +1271,54 @@
         sel.innerHTML = '<option value="">-- زبون عابر --</option>' + db.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
     }
 
-      function renderGlassTypesSelect() {
+        function renderGlassTypesSelect(filterText = '') {
         const sel = document.getElementById('pos-glass-type');
         if(!sel) return;
-        sel.innerHTML = (db.settings.plans || []).map(p => `
+        
+        // تصفية الأنواع بناءً على نص البحث
+        const filteredPlans = (db.settings.plans || []).filter(p => 
+            p.name.toLowerCase().includes(filterText.toLowerCase())
+        );
+
+        sel.innerHTML = filteredPlans.map(p => `
             <option value="${p.name}|${p.price}|${p.wholesalePrice || p.price}">${p.name} - تجزئة: ${p.price} / جملة: ${p.wholesalePrice || p.price}</option>
         `).join('');
+        
+        // إعادة حساب السعر بعد التصفية
+        calcGlassPreview();
+    }
+
+    function filterGlassSelect() {
+        const searchInput = document.getElementById('pos-glass-search-input');
+        if (searchInput) {
+            renderGlassTypesSelect(searchInput.value);
+        }
+    }
+
+        function selectGlassFromSearch(searchValue) {
+        // نبحث عن النوع الذي يطابق النص المكتوب
+        const matchedPlan = db.settings.plans.find(p => {
+            const optionText = `${p.name} | تجزئة: ${p.price} / جملة: ${p.wholesalePrice || p.price}`;
+            return optionText === searchValue;
+        });
+
+        if (matchedPlan) {
+            const hiddenInput = document.getElementById('pos-glass-type-hidden');
+            // نحفظ البيانات بنفس الصيغة القديمة (الاسم|السعر|سعر الجملة)
+            hiddenInput.value = `${matchedPlan.name}|${matchedPlan.price}|${matchedPlan.wholesalePrice || matchedPlan.price}`;
+            // نقوم بتشغيل حساب السعر
+            calcGlassPreview();
+        }
     }
 
     function calcGlassPreview() {
-        const w = parseFloat(document.getElementById('pos-width').value) / 100 || 0;
-        const h = parseFloat(document.getElementById('pos-height').value) / 100 || 0;
-        const qty = parseInt(document.getElementById('pos-qty').value) || 1;
+        const wInput = document.getElementById('pos-width').value;
+        const hInput = document.getElementById('pos-height').value;
+        const qtyInput = document.getElementById('pos-qty').value;
+        
+        const w = parseFloat(wInput) / 100 || 0;
+        const h = parseFloat(hInput) / 100 || 0;
+        const qty = parseInt(qtyInput) || 1;
         
         const typeVal = document.getElementById('pos-glass-type').value;
         const priceType = document.getElementById('pos-price-type') ? document.getElementById('pos-price-type').value : 'retail';
@@ -1240,36 +1326,46 @@
         let pricePerM = 0;
         if (typeVal) {
             const parts = typeVal.split('|');
+            // إذا كان هناك سعر جملة نأخذه، وإلا نأخذ سعر التجزئة
             pricePerM = priceType === 'wholesale' ? parseFloat(parts[2]) : parseFloat(parts[1]);
         }
         
         const cut = parseFloat(document.getElementById('pos-cut-cost').value) || 0;
         
+        // حساب السعر
         let total = ((w * h) * qty * pricePerM) + (cut * qty);
         if (db.settings.tvaEnabled) total += total * (db.settings.tvaRate / 100);
 
-        document.getElementById('glass-preview-price').innerText = total.toFixed(2);
+        // عرض السعر (إذا كان صفراً نعرض 0.00)
+        document.getElementById('glass-preview-price').innerText = total > 0 ? total.toFixed(2) : '0.00';
     }
 
     function addGlassToCart() {
         const w = parseFloat(document.getElementById('pos-width').value);
         const h = parseFloat(document.getElementById('pos-height').value);
         const qty = parseInt(document.getElementById('pos-qty').value);
-        const typeVal = document.getElementById('pos-glass-type').value;
+        const typeVal = document.getElementById('pos-glass-type').value; // القيمة من القائمة
         const priceType = document.getElementById('pos-price-type') ? document.getElementById('pos-price-type').value : 'retail';
         const cut = parseFloat(document.getElementById('pos-cut-cost').value) || 0;
         
+        // التحقق من صحة البيانات
         if (!w || !h) { showToast('أدخل المقاسات', 'warning'); return; }
+        if (!typeVal || typeVal === '') { showToast('اختر نوع الزجاج أولاً', 'warning'); return; }
 
         const areaPerPiece = (w/100) * (h/100);
         
-        // تحديد السعر بناءً على اختيار تجزئة أو جملة
+        // استخراج السعر بأمان
         const parts = typeVal.split('|');
+        if (parts.length < 2) { showToast('خطأ في نوع الزجاج المحدد', 'error'); return; }
+        
         const pricePerMeter = priceType === 'wholesale' ? parseFloat(parts[2]) : parseFloat(parts[1]);
         
+        if (isNaN(pricePerMeter)) { showToast('سعر الزجاج غير صحيح', 'error'); return; }
+
         let pricePerPiece = (areaPerPiece * pricePerMeter) + cut;
         if (db.settings.tvaEnabled) pricePerPiece += pricePerPiece * (db.settings.tvaRate / 100);
 
+        // إضافة للسلة
         cart.push({ 
             id: 'glass-'+Date.now(), 
             name: parts[0] + (priceType === 'wholesale' ? ' (جملة)' : ''), 
@@ -1284,6 +1380,7 @@
         
         updateCartUI();
         
+        // تفريغ الحقول
         document.getElementById('pos-width').value = ''; 
         document.getElementById('pos-height').value = '';
         document.getElementById('pos-qty').value = '1'; 
@@ -1700,10 +1797,23 @@
             printFrame.contentWindow.print();
         }, 500);
     }
-        function renderInventory() {
+    function renderInventory() {
         const body = document.getElementById('inventory-table-body');
+        const searchInput = document.getElementById('inventory-search');
         if (!body) return;
-        body.innerHTML = db.products.map(p => `
+
+        // قراءة قيمة البحث
+        const searchVal = searchInput ? searchInput.value.toLowerCase() : '';
+        
+        // تصفية المنتجات بناءً على الاسم
+        const filteredProducts = db.products.filter(p => p.name.toLowerCase().includes(searchVal));
+
+        if (filteredProducts.length === 0) {
+            body.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #9ca3af;">لا توجد منتجات مطابقة</td></tr>`;
+            return;
+        }
+
+        body.innerHTML = filteredProducts.map(p => `
             <tr>
                 <td style="font-weight: 700;">${p.name}</td>
                 <td><div style="color: #d97706; font-size: 11px;">${(p.purchasePrice||0).toLocaleString()}</div><div style="color: #1e40af; font-weight: 700;">${p.price.toLocaleString()}</div></td>
@@ -1719,9 +1829,21 @@
 
     function renderPlansList() {
         const container = document.getElementById('plans-list-container');
+        const searchInput = document.getElementById('plans-search');
         if (!container) return;
         
-        container.innerHTML = (db.settings.plans || []).map(p => `
+        // قراءة قيمة البحث
+        const searchVal = searchInput ? searchInput.value.toLowerCase() : '';
+        
+        // تصفية الأنواع بناءً على الاسم
+        const filteredPlans = (db.settings.plans || []).filter(p => p.name.toLowerCase().includes(searchVal));
+
+        if (filteredPlans.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: #9ca3af; padding: 10px;">لا توجد أنواع مطابقة</div>`;
+            return;
+        }
+        
+        container.innerHTML = filteredPlans.map(p => `
             <div style="padding: 12px; background: rgba(139,92,246,0.05); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border: 1px solid rgba(139,92,246,0.1);">
                 <div>
                     <div style="font-weight: 800; font-size: 14px; color: #1f2937;">${p.name}</div>
